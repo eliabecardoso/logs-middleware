@@ -1,0 +1,35 @@
+{
+  "name": "monitor-project",
+  "version": "1.0.0",
+  "description": "Monitor Project (Logger, Context, AppMetrics)",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/eliabecardoso/logs-middleware.git"
+  },
+  "keywords": [
+    "log",
+    "cls",
+    "logging",
+    "loglevel",
+    "koa",
+    "express",
+    "graphql",
+    "grpc"
+  ],
+  "author": "eliabe.hc@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eliabecardoso/logs-middleware/issues"
+  },
+  "homepage": "https://github.com/eliabecardoso/logs-middleware#readme",
+  "dependencies": {
+    "cls-hooked": "^4.2.2",
+    "dotenv": "^10.0.0",
+    "uuid": "^8.3.2",
+    "winston": "^3.3.3"
+  }
+}
