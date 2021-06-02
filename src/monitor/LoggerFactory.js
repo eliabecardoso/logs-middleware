@@ -1,8 +1,7 @@
 const { basename } = require('path');
-require('dotenv/config');
 const cls = require('cls-hooked');
 const winston = require('winston');
-const { transports } = require('winston');
+const AWSCloudWatch = require('winston-aws-cloudwatch');
 
 const {
   format,
@@ -18,7 +17,7 @@ class LoggerFactory {
     this.log = winston.createLogger({
       level: 'debug',
       format: this.format(),
-      transports: [this.transports()],
+      transports: [...this.transports()],
     });
   }
 
@@ -27,54 +26,67 @@ class LoggerFactory {
   }
 
   transports() {
-    const { logHttp, logConsole, logFileError, logFile } = this.options;
+    const {
+      http,
+      httpWarn,
+      console: consoleLog,
+      file,
+      fileWarn,
+    } = this.options.types;
     let transport = [];
 
-    if (logHttp) {
-      transports = [...transports, new WHttp(this.optsHttp())];
+    if (http) {
+      transport = [...transport, new WHttp(this.optsHttp())];
     }
 
-    if (logConsole) {
-      transports = [...transports, new WConsole(this.optsConsole())];
+    if (httpWarn) {
+      transport = [...transport, new WHttp(this.optsHttp())];
     }
 
-    if (logFileError) {
-      transports = [...transports, new WFile(this.optsFileError())];
+    if (consoleLog !== false) {
+      transport = [...transport, new WConsole(this.optsConsole())];
     }
 
-    if (logFile) {
-      transports = [...transports, new WFile(this.optsFile())];
+    if (file) {
+      transport = [
+        ...transport,
+        new WFile(this.optsFile({ filename: 'temp/logs/combined.log' })),
+      ];
+    }
+
+    if (fileWarn) {
+      transport = [
+        ...transport,
+        new WFile(
+          this.optsFile({ filename: 'temp/logs/error.log', level: 'warn' })
+        ),
+      ];
     }
 
     return transport;
   }
 
-  optsHttp() {
+  optsHttp({ level = 'warn' } = {}) {
     return {
+      level,
       host: 'https://',
       // port: '',
       // path: '',
-      level: 'debug',
-      auth: { username: 'jhondoe', password: '#foo!', bearer: 'b.a$r' },
+      auth: { username: 'jhondoe', password: '@foo!', bearer: 'b.a$r' },
       agent: '',
       ssl: '',
       headers: {},
-      silent: '',
       close: () => {},
-      format: format.combine(() => {}),
+      format: this.format({ http: true }),
     };
   }
 
-  optsFileError() {
-    return { filename: 'temp/logs/err.log', level: 'error' };
-  }
-
-  optsConsole() {
+  optsConsole({} = {}) {
     return { format: this.consoleFormat() };
   }
 
-  optsFile() {
-    return { filename: 'temp/logs/combined.log' };
+  optsFile({ filename, level = 'debug' } = {}) {
+    return { filename, level };
   }
 
   silence() {
@@ -96,14 +108,14 @@ class LoggerFactory {
     };
 
     return format.combine(
-      format(this.ignorePrivate)(),
+      format(this.privateLog)(),
       format.colorize({ all: true }),
       format.timestamp({ format: 'HH:mm:ss' }),
       format.printf(consoleFormatter)
     );
   }
 
-  format() {
+  format(opts) {
     const jsonFormatter = (info, _) => {
       const { timestamp, label, level, message, metadata } = info;
       const meta = { metadata, requestId: this.getRequestId() };
@@ -113,7 +125,7 @@ class LoggerFactory {
     };
 
     return format.combine(
-      format(this.ignorePrivate)(),
+      format(this.privateLog)(opts),
       format.label({ label: this.appName }),
       format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
       format.metadata({
@@ -123,8 +135,9 @@ class LoggerFactory {
     );
   }
 
-  ignorePrivate(info, opts) {
-    if (info.private) {
+  privateLog(info, opts) {
+    const hide = info.private && !opts.http;
+    if (hide) {
       return false;
     }
     return info;

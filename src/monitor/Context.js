@@ -1,4 +1,3 @@
-require('dotenv/config');
 const cls = require('cls-hooked');
 const { v4 } = require('uuid');
 
@@ -60,7 +59,4 @@ class Context {
   }
 }
 
-// module.exports = Context;
-
-new Context('Compliance');
-new Context('Compliance');
+module.exports = Context;
