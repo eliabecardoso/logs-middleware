@@ -2,6 +2,7 @@ const { basename } = require('path');
 const cls = require('cls-hooked');
 const winston = require('winston');
 const AWSCloudWatch = require('winston-aws-cloudwatch');
+const Ajv = require('ajv').default;
 
 const {
   format,
@@ -9,14 +10,25 @@ const {
 } = winston;
 const MESSAGE = Symbol.for('message');
 
+class LoggerError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = LoggerError.name;
+  }
+}
+
 class LoggerFactory {
   constructor(appName, options = {}) {
+    const ajv = new Ajv();
+    if (!ajv.validate({}, options)) {
+      throw new LoggerError(ajv.errors);
+    }
     this.appName = appName || process.env.APP_NAME;
     this.options = options;
     this.moduleName;
     this.log = winston.createLogger({
-      level: 'debug',
-      format: this.format(),
+      level: options.level,
+      format: this.format(options),
       transports: [...this.transports()],
     });
   }
@@ -27,81 +39,52 @@ class LoggerFactory {
 
   transports() {
     const {
-      http,
-      httpWarn,
-      console: consoleLog,
-      file,
-      fileWarn,
-    } = this.options.types;
+      console: consoleConfig,
+      streams: streamsConfig = [],
+      files: filesSetup = [],
+      https: httpConnections = [],
+      awscws: awscwConnections = [],
+    } = this.options.transporters;
     let transport = [];
 
-    if (http) {
-      transport = [...transport, new WHttp(this.optsHttp())];
+    if (consoleConfig) {
+      transport = [...transport, new WConsole(this.optsConsole(consoleConfig))];
     }
 
-    if (httpWarn) {
-      transport = [...transport, new WHttp(this.optsHttp())];
-    }
-
-    if (consoleLog !== false) {
-      transport = [...transport, new WConsole(this.optsConsole())];
-    }
-
-    if (file) {
-      transport = [
-        ...transport,
-        new WFile(this.optsFile({ filename: 'temp/logs/combined.log' })),
-      ];
-    }
-
-    if (fileWarn) {
-      transport = [
-        ...transport,
-        new WFile(
-          this.optsFile({ filename: 'temp/logs/error.log', level: 'warn' })
-        ),
-      ];
-    }
-
-    return transport;
+    return [
+      ...transport,
+      ...streamsConfig.map((stream) => new WStream(stream)),
+      ...filesSetup.map((file) => new WFile(file)),
+      ...httpConnections.map((http) => new WHttp(http)),
+      ...awscwConnections.map((cw) => new AWSCloudWatch(cw)),
+    ];
   }
 
-  optsHttp({ level = 'warn' } = {}) {
+  optsConsole({ level = 'debug', format, opts } = {}) {
     return {
       level,
-      host: 'https://',
-      // port: '',
-      // path: '',
-      auth: { username: 'jhondoe', password: '@foo!', bearer: 'b.a$r' },
-      agent: '',
-      ssl: '',
-      headers: {},
-      close: () => {},
-      format: this.format({ http: true }),
+      format: (format && format(opts)) || this.consoleFormat(opts),
     };
   }
 
-  optsConsole({} = {}) {
-    return { format: this.consoleFormat() };
-  }
-
-  optsFile({ filename, level = 'debug' } = {}) {
-    return { filename, level };
-  }
-
   silence() {
-    return ['production', 'prd'].includes(process.env.ENV.toLowerCase());
+    return ['production', 'prod', 'prd'].includes(
+      process.env.NODE_ENV.toLowerCase()
+    );
   }
 
-  getRequestId() {
-    const context = cls.getNamespace(this.appName);
-    return context ? context.get('requestId') : 'NO_CONTEXT';
+  getContextMetadata() {
+    const ctx = cls.getNamespace(this.appName);
+    if (!ctx) return;
+    return {
+      requestId: ctx.get('requestId'),
+    };
   }
 
-  consoleFormat() {
+  consoleFormat({ colorize = false } = {}) {
     const consoleFormatter = (info) => {
       const { timestamp, level, message, metadata } = info;
-      const meta = { metadata, requestId: this.getRequestId() };
+      const meta = { metadata, ...this.getContextMetadata() };
       const json = JSON.stringify(meta);
 
       return `[${timestamp}][${this.moduleName}][${level}]: ${message} - ${json}`;
@@ -109,8 +92,8 @@ class LoggerFactory {
 
     return format.combine(
       format(this.privateLog)(),
-      format.colorize({ all: true }),
-      format.timestamp({ format: 'HH:mm:ss' }),
+      format.colorize({ all: colorize }),
+      format.timestamp({ format: 'HH:mm:ss.SSS' }),
       format.printf(consoleFormatter)
     );
   }
@@ -118,9 +101,16 @@ class LoggerFactory {
   format(opts) {
     const jsonFormatter = (info, _) => {
       const { timestamp, label, level, message, metadata } = info;
-      const meta = { metadata, requestId: this.getRequestId() };
+      const meta = {
+        metadata: {
+          ...this.sanitizeMetadata(metadata, opts),
+          ...this.getContextMetadata(),
+        },
+      };
+
       const json = Object.assign({ timestamp, label, level, message }, meta);
       info[MESSAGE] = JSON.stringify(json);
+
       return info;
     };
 
@@ -135,8 +125,15 @@ class LoggerFactory {
     );
   }
 
+  sanitizeMetadata(data, opts) {
+    if (!opts.sensitiveMetadata) return data;
+    return Object.keys(data)
+      .filter((k) => ![...opts.sensitiveMetadata].includes(k))
+      .reduce((obj, cur) => ({ ...obj, [cur]: data[cur] }));
+  }
+
   privateLog(info, opts) {
-    const hide = info.private && !opts.http;
+    const hide = info.private && !opts.transporters.awscw;
     if (hide) {
       return false;
     }

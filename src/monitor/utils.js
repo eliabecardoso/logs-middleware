@@ -1,12 +1,14 @@
 const valueTypeofs = {
   bool: (v) => v === 'true',
   number: (v) => Number(v),
+  array: (v) => new Array(...v),
   any: (v) => v,
 };
 
 exports.transformStringToKeyValue = (
   input,
-  { separate = ';', keyValueSeparate = '=', valueTypeof = 'bool' } = {}
+  valueTypeof = 'bool',
+  { separate = ';', keyValueSeparate = '=' } = {}
 ) => {
   if (!input || typeof input !== 'string') return;
   const keyValues = input.split(separate);

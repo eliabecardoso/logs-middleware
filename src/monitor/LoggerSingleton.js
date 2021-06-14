@@ -1,15 +1,8 @@
 const LoggerFactory = require('./LoggerFactory');
+require('winston-aws-cloudwatch');
 
-const { transformStringToKeyValue } = require('./utils');
-
-const logTypesEnv =
-  'http=false;httpWarn=false;console=true;file=false;fileWarn=true';
-
-const config = () => {
-  return {
-    types: transformStringToKeyValue(logTypesEnv), // process.env.LOG_TYPES
-  };
-};
+// const path = require('path');
+// console.log('#', path.resolve(__dirname), require.main.path, process.cwd());
 
 module.exports = ((appName, options = {}) => {
   let instance;
@@ -20,4 +13,7 @@ module.exports = ((appName, options = {}) => {
     instance.setModule(module);
     return instance.log;
   };
-})(process.APP_NAME || 'Compliance', config());
+})(
+  process.APP_NAME || 'Compliance',
+  require(`${process.cwd()}/src/config/loggerConfig`)
+);

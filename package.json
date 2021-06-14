@@ -27,6 +27,7 @@
   },
   "homepage": "https://github.com/eliabecardoso/logs-middleware#readme",
   "dependencies": {
+    "ajv": "^8.6.0",
     "cls-hooked": "^4.2.2",
     "dotenv": "^10.0.0",
     "uuid": "^8.3.2",
