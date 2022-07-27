@@ -8,7 +8,7 @@ const config = {
     transporters: {
       console: { level: 'debug', opts: { colorize: true } },
       files: [
-        { filename: `${rootPath}/temp/logs/all.log` },
+        { filename: `${rootPath}/temp/logs/all.log`, level: 'info' },
         { filename: `${rootPath}/temp/logs/error.log`, level: 'error' },
       ],
     },
@@ -21,8 +21,8 @@ const config = {
   },
 };
 
-const getEnvConfig = (obj) =>
-  Object.keys(obj).find((key) =>
+const getEnvConfig = (config) =>
+  Object.keys(config).find((key) =>
     key.split('|').some((k) => !!k.match(process.env.NODE_ENV))
   );
 

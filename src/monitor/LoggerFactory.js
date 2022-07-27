@@ -26,7 +26,7 @@ class LoggerFactory {
     this.appName = appName || process.env.APP_NAME;
     this.options = options;
     this.moduleName;
-    this.log = winston.createLogger({
+    this.logger = winston.createLogger({
       level: options.level,
       format: this.format(options),
       transports: [...this.transports()],
@@ -34,7 +34,7 @@ class LoggerFactory {
   }
 
   setModule(module) {
-    this.moduleName = basename(module.filename, '.js');
+    this.moduleName = basename(module.filename);
   }
 
   transports() {
@@ -87,7 +87,7 @@ class LoggerFactory {
       const meta = { metadata, ...this.getContextMetadata() };
       const json = JSON.stringify(meta);
 
-      return `[${timestamp}][${this.moduleName}][${level}]: ${message} - ${json}`;
+      return `[${timestamp}][${level}]: ${message} - ${json}`;
     };
 
     return format.combine(

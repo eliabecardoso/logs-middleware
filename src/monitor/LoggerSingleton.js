@@ -9,11 +9,12 @@ module.exports = ((appName, options = {}) => {
   return (module) => {
     if (!instance) {
       instance = new LoggerFactory(appName, options);
+      // instance.setModule(module);
+      instance.logger.info('Logger loaded.');
     }
-    instance.setModule(module);
-    return instance.log;
+    return instance.logger;
   };
 })(
-  process.APP_NAME || 'Compliance',
-  require(`${process.cwd()}/src/config/loggerConfig`)
+  process.env.APP_NAME || 'Logger',
+  require(`${__dirname}/../config/loggerConfig`),
 );
